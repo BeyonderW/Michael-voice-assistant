@@ -2,12 +2,14 @@ import os
 import subprocess
 import psutil
 import requests
+import time
 import pygetwindow as gw
 from datetime import datetime
 from web_search import web_search
 from file_search import search_files
 from app_search import get_installed_apps
 from process_man import track_launch, close_by_pid
+from twilio.rest import Client
 
 installed_apps = get_installed_apps()
 
@@ -186,3 +188,45 @@ def get_upcoming_contests():
     
     except Exception:
         return "I couldn't reach CodeChef right now."
+
+
+
+
+def run_system_telemetry(classify_func):
+    try:
+        # Measure active memory usage of Michael's process
+        process = psutil.Process(os.getpid())
+        ram_mb = process.memory_info().rss / (1024 * 1024)
+        
+        # Benchmark the NLP routing latency directly
+        start = time.perf_counter()
+        classify_func("close google chrome") 
+        latency_ms = (time.perf_counter() - start) * 1000
+        
+        return (
+            f"System telemetry normal. Local routing latency is {latency_ms:.1f} milliseconds. "
+            f"Active memory usage is {ram_mb:.1f} megabytes."
+        )
+    except Exception:
+        return "Unable to run system diagnostics."
+
+
+
+
+
+
+def get_weather():
+    api_key = os.environ.get("WEATHER_API_KEY")
+    city = "Pune" 
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+    
+    try:
+        response = requests.get(url).json()
+        if response.get("cod") != 200:
+            return "I couldn't fetch the weather right now."
+        
+        temp = round(response["main"]["temp"])
+        desc = response["weather"][0]["description"]
+        return f"The current temperature in {city} is {temp} degrees Celsius with {desc}."
+    except Exception:
+        return "I am having trouble connecting to the weather service."

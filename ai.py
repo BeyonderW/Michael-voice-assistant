@@ -50,3 +50,14 @@ def ask_once(prompt):
         ]
     )
     return respone.choices[0].message.content
+
+# Append to or incorporate into your existing ai.py
+
+
+# Reuse your existing initialization pattern
+groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+def get_groq_client() -> Groq:
+    """Provides access to the shared Groq client instance."""
+    return groq_client
+

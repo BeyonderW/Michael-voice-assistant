@@ -5,7 +5,11 @@ from commands import (
     get_date,
     find_file,
     get_upcoming_contests,
+    run_system_telemetry,
+    get_weather,
+    call_my_phone,
 )
+from router import classify_request
 
 import pyautogui
 import cv2
@@ -13,6 +17,7 @@ import screen_brightness_control as sbc
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 from comtypes import CLSCTX_ALL
 from ctypes import cast, POINTER
+from website import open_website
 
 devices = AudioUtilities.GetSpeakers()
 interface = devices.Activate(
@@ -104,7 +109,12 @@ handlers = {
     "MAX_BRIGHTNESS": lambda _: max_brightness(),
     "MIN_BRIGHTNESS": lambda _: min_brightness(),
     "FIND_FILE": find_file,
-    "CODECHEF": lambda _: get_upcoming_contests()
+    "CODECHEF": lambda _: get_upcoming_contests(),
+        "OPEN_WEBSITE": open_website,
+
+    "DIAGNOSTICS": lambda _: run_system_telemetry(classify_request),
+    "WEATHER": lambda _: get_weather(),
+    "CALL_PHONE": lambda _: call_my_phone(),
 }
 
 

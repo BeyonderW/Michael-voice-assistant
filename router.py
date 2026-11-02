@@ -1,7 +1,15 @@
+"""router.py - Routing pipeline integrating the Task Execution Engine."""
 import re
 import spacy
 from intent import *
 from entities import extract_app, extract_file
+from website import extract_website
+from typing import Callable , Optional
+from ai import get_groq_client
+from agent.planner import TaskPlanner
+from agent.engine import TaskExecutionEngine
+
+planner = TaskPlanner(groq_client=get_groq_client())
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -63,6 +71,16 @@ def classify_request(user):
                     "confidence": 0.98,
                     "negated": False
                 }
+                # Websites
+    if any(t.lemma_ in ["open", "launch", "go", "visit", "browse", "start"] for t in doc):
+        site_url = extract_website(user)
+        if site_url:
+            return {
+                "intent": OPEN_WEBSITE,
+                "entity": site_url,
+                "confidence": 0.95,
+                "negated": False
+            }
 
     # Screenshot
     if "screenshot" in user:
@@ -184,6 +202,21 @@ def classify_request(user):
             "negated": False
         }
 
+    if any(word in user.lower() for word in ["diagnostics", "telemetry", "benchmark", "system status"]):
+        return {
+            "intent": "DIAGNOSTICS", 
+            "entity": None, 
+            "confidence": 0.95, 
+            "negated": False
+        }
+
+    if any(word in user.lower() for word in ["weather", "temperature", "forecast"]):
+        return {"intent": "WEATHER", "entity": None, "confidence": 0.95, "negated": False}
+
+
+    if any(word in user.lower() for word in ["call my phone", "ring my phone", "call me", "call"]):
+        return {"intent": "CALL_PHONE", "entity": None, "confidence": 0.95, "negated": False}
+
     # Web
     if any(word in user for word in [
         "weather", "news", "score", "stock",
@@ -202,3 +235,60 @@ def classify_request(user):
         "confidence": 0.80,
         "negated": False
     }
+
+
+
+def is_multistep_task(user_input: str) -> bool:
+    """Detect whether user input implies an autonomous multi-step workflow."""
+    indicators = [
+        r"\band\s+then\b",
+        r"\bafter\s+that\b",
+        r"\bcreate\b.*\band\b",
+        r"\bopen\b.*\band\b",
+        r"\bworkflow\b",
+        r"\bplan\b",
+        r"\bprepare\s+workspace\b"
+    ]
+    lowered = user_input.lower().strip()
+    return any(re.search(pattern, lowered) for pattern in indicators)
+
+
+def route_input(
+    user_input: str,
+    speak_callback: Callable[[str], None],
+    status_callback: Optional[Callable[[str], None]] = None,
+    confirm_callback: Optional[Callable[[str], bool]] = None
+) -> str:
+    """Main routing function for voice and text commands."""
+    clean_input = user_input.strip()
+
+    # Route 1: Autonomous Multi-Step Engine
+    if is_multistep_task(clean_input):
+        speak_callback("Planning the task now.")
+        
+        try:
+            plan = planner.plan(clean_input)
+            engine = TaskExecutionEngine(step_timeout_seconds=8, confirm_callback=confirm_callback)
+            
+            result = engine.execute_plan(plan, status_callback=status_callback)
+            
+            # Speak and return the truthful summary
+            speak_callback(result["summary"])
+            return result["summary"]
+        except Exception as e:
+            err_msg = f"Task engine encountered a planning error: {str(e)}"
+            speak_callback(err_msg)
+            return err_msg
+
+    # Route 2: Preserve Existing Local Single Commands
+    # (Hook into your existing commands.py dispatcher here)
+    # from commands import handle_direct_command
+    # if handle_direct_command(clean_input):
+    #     return "Handled locally."
+
+    # Route 3: Standard Conversational Fallback
+    # (Hook into your existing ai.py chat completion)
+    # response = chat_with_groq(clean_input)
+    # speak_callback(response)
+    # return response
+    return "Handled via default conversation."

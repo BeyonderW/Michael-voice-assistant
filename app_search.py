@@ -80,26 +80,20 @@ def get_installed_apps():
 INSTALLED_APPS = get_installed_apps()
 
 
+ACTION_WORDS = {"open", "launch", "start", "run", "close", "quit", "exit", "terminate", "kill"}
+
+def _squash(text):
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
 def find_best_app(user_input):
-    user_input = user_input.lower()
+    words = [w for w in user_input.lower().split() if w not in ACTION_WORDS]
+    query = _squash("".join(words))
+    if not query:
+        return None
 
-    for word in ["open", "launch", "start", "run", "close", "quit", "exit", "terminate", "kill"]:
-        user_input = user_input.replace(word, "")
-
-    user_input = user_input.strip()
-
-    match = process.extractOne(
-        user_input,
-        INSTALLED_APPS.keys(),
-        scorer=fuzz.partial_ratio,
-        score_cutoff=60
-    )
-
-    if match:
-        return match[0]
-
-    return None
-
+    squashed = {_squash(name): name for name in INSTALLED_APPS}
+    match = process.extractOne(query, squashed.keys(), scorer=fuzz.WRatio, score_cutoff=75)
+    return squashed[match[0]] if match else None
 
 if __name__ == "__main__":
     apps = get_installed_apps()
